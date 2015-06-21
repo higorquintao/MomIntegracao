@@ -30,6 +30,10 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Newtonsoft.Json, Version=6.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.6.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -41,14 +45,22 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="GerenciadorDeFilas.cs" />
-    <Compile Include="QueueUtils\Mensagem.cs" />
+    <Compile Include="ModelosDeIntegracao\Mensagem.cs" />
+    <Compile Include="ModelosDeIntegracao\RespostaSubscribe.cs" />
+    <Compile Include="QueueUtils\IlegalSubscribeException.cs" />
+    <Compile Include="QueueUtils\MensagemParaEnvio.cs" />
+    <Compile Include="QueueUtils\ModeloDeIntegracaoIlegalException.cs" />
     <Compile Include="QueueUtils\Queue.cs" />
+    <Compile Include="QueueUtils\QueueException.cs" />
     <Compile Include="QueueUtils\QueueServer.cs" />
-    <Compile Include="QueueUtils\Subscribe.cs" />
+    <Compile Include="ModelosDeIntegracao\Subscribe.cs" />
+    <Compile Include="RoteadorDeMensagens\Roteador.cs" />
     <Compile Include="Run.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

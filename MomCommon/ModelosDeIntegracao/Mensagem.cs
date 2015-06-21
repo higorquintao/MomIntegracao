@@ -4,12 +4,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MomCommon.QueueUtils
+namespace MomCommon.ModelosDeIntegracao
 {
     public class Mensagem
     {
-        public string mensagem { get; set; }
+        public string nomeFila;
 
-        public bool jaConsumida { get; set; }
+        public string mensagem;
     }
 }

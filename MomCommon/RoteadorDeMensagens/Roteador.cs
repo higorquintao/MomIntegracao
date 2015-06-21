@@ -1,4 +1,5 @@
 ﻿using MomCommon.ModelosDeIntegracao;
+using MomCommon.QueueUtils;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -9,17 +10,16 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace MomCommon.QueueUtils
+namespace MomCommon.RoteadorDeMensagens
 {
-    class QueueServer
+    public class Roteador
     {
-
         private int _portaDeInicio;
         private bool _servidorIniciado;
         private Thread _threadPricipal;
         private GerenciadorDeFilas _gerenciadorDefilas;
 
-        public QueueServer(int portaDeInicio, GerenciadorDeFilas gerenciadorDeFilas)
+        public Roteador(int portaDeInicio, GerenciadorDeFilas gerenciadorDeFilas)
         {
             this._portaDeInicio = portaDeInicio;
             this._servidorIniciado = false;
@@ -27,24 +27,24 @@ namespace MomCommon.QueueUtils
             this._threadPricipal = new Thread(new ThreadStart(RunThread));
         }
 
-        public void IniciarServidor()
+        public void IniciarRoteador()
         {
             if (!this._servidorIniciado)
             {
-                Console.WriteLine("Iniciando servidor de filas.");
+                Console.WriteLine("Iniciando roteador de mensagens.");
                 this._threadPricipal.Start();
-                Console.WriteLine("Servidor de filas iniciado com sucesso.");
+                Console.WriteLine("Roteador de mensagens iniciado com sucesso.");
                 this._servidorIniciado = true;
             }
         }
 
-        public void PararServidor()
+        public void PararRoteador()
         {
             if (this._servidorIniciado)
             {
-                Console.WriteLine("Parando servidor de filas.");
+                Console.WriteLine("Parando roteador de mensagens.");
                 this._threadPricipal.Abort();
-                Console.WriteLine("Servidor de filas parado com sucesso.");
+                Console.WriteLine("Roteador de mensagens parado com sucesso.");
                 this._servidorIniciado = false;
             }
         }
@@ -72,34 +72,40 @@ namespace MomCommon.QueueUtils
                     }
                     try
                     {
-                        var subscribe = InterpretarMensagemRecebida(stringBuffer.ToString());
-                        int porta = 0;
+                        var mensagem = InterpretarMensagemRecebida(stringBuffer.ToString());
                         lock (this._gerenciadorDefilas)
                         {
-                            porta = this._gerenciadorDefilas.InicieNovaFila(subscribe);
+                            var queue = this._gerenciadorDefilas.ObtenhaFilaPeloNome(mensagem.nomeFila);
+                            if(queue != null)
+                            {
+                                queue.PublicarMensagem(mensagem.mensagem);
+
+                            }else
+                            {
+                                var mensagemDeRetorno = JsonConvert.SerializeObject(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Não foi possível publicar sua mensagem, verifique se o nome da fila esta correto." });
+                                byte[] bytesDeEnvio = Encoding.UTF8.GetBytes(mensagemDeRetorno);
+                                networkStream.Write(bytesDeEnvio, 0, bytesDeEnvio.Length);
+                            }
                         }
-                        var mensagemDeRetorno = JsonConvert.SerializeObject(new RespostaSubscribe() { sucesso = true, porta = porta, mensagem = "Fila criada com sucesso!" });
-                        byte[] bytesDeEnvio = Encoding.UTF8.GetBytes(mensagemDeRetorno);
-                        networkStream.Write(bytesDeEnvio, 0, bytesDeEnvio.Length);
                     }
                     catch (ModeloDeIntegracaoIlegalException)
                     {
                         var mensagemDeRetorno = JsonConvert.SerializeObject(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Não foi possível iniciar uma nova fila, verifique se os dados envidos estão dentro padrão." });
                         byte[] bytesDeEnvio = Encoding.UTF8.GetBytes(mensagemDeRetorno);
                         networkStream.Write(bytesDeEnvio, 0, bytesDeEnvio.Length);
-                        throw new QueueException("Erro ao inciar fila, subscribe informado é inválido");
+                        throw new QueueException("Erro ao submeter mensagem, formato da mensagem inválido.");
                     }
                     catch (Exception e)
                     {
-                        var mensagemDeRetorno = JsonConvert.SerializeObject(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Ocorreu um erro inesperado ao inicar fila. " + e.Message });
+                        var mensagemDeRetorno = JsonConvert.SerializeObject(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Ocorreu um erro inesperado ao obter fila. " + e.Message });
                         byte[] bytesDeEnvio = Encoding.UTF8.GetBytes(mensagemDeRetorno);
                         networkStream.Write(bytesDeEnvio, 0, bytesDeEnvio.Length);
-                        throw new QueueException(string.Format("Erro desconhecido ao inciar fila. {0} {1} {2}", e, e.Message, e.StackTrace));
+                        throw new QueueException(string.Format("Erro desconhecido ao obter mensagem. {0} {1} {2}", e, e.Message, e.StackTrace));
                     }
                     cliente.Close();
                 }
             }
-            catch(QueueException e)
+            catch (QueueException e)
             {
                 Console.WriteLine(e.Message);
             }
@@ -111,11 +117,11 @@ namespace MomCommon.QueueUtils
             }
             finally
             {
-                if(cliente != null)
+                if (cliente != null)
                 {
                     cliente.Close();
                 }
-                
+
                 if (servidor != null)
                 {
                     servidor.Stop();
@@ -126,18 +132,17 @@ namespace MomCommon.QueueUtils
             }
         }
 
-        private Subscribe InterpretarMensagemRecebida(string mensagem)
+        private Mensagem InterpretarMensagemRecebida(string mensagem)
         {
             try
             {
-                return JsonConvert.DeserializeObject<Subscribe>(mensagem);
+                return JsonConvert.DeserializeObject<Mensagem>(mensagem);
             }
             catch
             {
                 throw new ModeloDeIntegracaoIlegalException();
             }
         }
-
 
     }
 }

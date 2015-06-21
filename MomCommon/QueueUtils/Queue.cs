@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MomCommon.ModelosDeIntegracao;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -13,10 +14,11 @@ namespace MomCommon.QueueUtils
 
         private Thread _threadPrincipal;
         private Subscribe _subscribe;
-        private LinkedList<Mensagem> _listaDeMensagens;
+        private LinkedList<MensagemParaEnvio> _listaDeMensagens;
         private TcpListener _servidor;
         private TcpClient _cliente;
         private bool _estadoDaConexao;
+        private int _porta;
 
         private bool _existeNovaMensagem
         {
@@ -27,12 +29,11 @@ namespace MomCommon.QueueUtils
         }
 
 
-        public Queue(Subscribe subscribe)
+        public Queue(Subscribe subscribe, int porta)
         {
             this._subscribe = subscribe;
-            this._listaDeMensagens = new LinkedList<Mensagem>();
-            this._threadPrincipal = new Thread(new ThreadStart(Run));
-            this._threadPrincipal.Start();
+            this._porta = porta;
+            this._listaDeMensagens = new LinkedList<MensagemParaEnvio>();
         }
 
         private void Run()
@@ -40,7 +41,7 @@ namespace MomCommon.QueueUtils
             try
             {
                 var ip = IPAddress.Parse("127.0.0.1");
-                _servidor = new TcpListener(ip, this._subscribe.porta);
+                _servidor = new TcpListener(ip, this._porta);
                 _servidor.Start();
 
                 byte[] buffer = new byte[1024]; ;
@@ -63,9 +64,12 @@ namespace MomCommon.QueueUtils
                     _cliente.Close();
                 }
             }
-            catch
+            catch (Exception e)
             {
-
+                Console.WriteLine(string.Format("Ocorreu um erro ao tentar iniciar a fila do subscriber {0} na porta {1}.", _subscribe.nome, _porta));
+                Console.WriteLine(e.Message);
+                Console.WriteLine(e.StackTrace);
+                throw;
             }
             finally
             {
@@ -74,7 +78,6 @@ namespace MomCommon.QueueUtils
                     _servidor.Stop();
                 }
                 _estadoDaConexao = false;
-                Run();
             }
         }
 
@@ -82,7 +85,7 @@ namespace MomCommon.QueueUtils
         {
             if (mensagem != null)
             {
-                this._listaDeMensagens.AddLast(new Mensagem()
+                this._listaDeMensagens.AddLast(new MensagemParaEnvio()
                 {
                     mensagem = mensagem,
                     jaConsumida = false
@@ -93,6 +96,11 @@ namespace MomCommon.QueueUtils
         public Subscribe ObtenhaSubscribe()
         {
             return this._subscribe;
+        }
+
+        public int ObtenhaPortaUtilizada()
+        {
+            return this._porta;
         }
 
         private string ObtenhaProximaMensagem()
@@ -107,15 +115,32 @@ namespace MomCommon.QueueUtils
             return _servidor != null && _cliente != null && _cliente.Connected;
         }
 
+        public bool IniciarFila()
+        {
+            if (this._threadPrincipal != null)
+            {
+                this._threadPrincipal = new Thread(new ThreadStart(Run));
+                this._threadPrincipal.Start();
+                return true;
+            }
+            return false;
+        }
+
         public void EncerrarFila()
         {
-            if (this._cliente != null)
+            lock (this._cliente)
             {
-                this._cliente.Close();
+                if (this._cliente != null)
+                {
+                    this._cliente.Close();
+                }
             }
-            if (this._servidor != null)
+            lock (this._servidor)
             {
-                this._servidor.Stop();
+                if (this._servidor != null)
+                {
+                    this._servidor.Stop();
+                }
             }
             this._threadPrincipal.Abort();
         }
