@@ -31,7 +31,7 @@ namespace MomCommon
 
         public void PararMonitorDeFilas()
         {
-            if(this._threadDeMonitoramento != null && this._threadDeMonitoramento.IsAlive)
+            if (this._threadDeMonitoramento != null && this._threadDeMonitoramento.IsAlive)
             {
                 this._threadDeMonitoramento.Abort();
             }
@@ -69,9 +69,15 @@ namespace MomCommon
                         try
                         {
                             var queue = new Queue(subscribe, ObtenhaProximaPortaDisponivel());
-                            queue.IniciarFila();
-                            this._filas.Add(queue);
-                            return queue.ObtenhaPortaUtilizada();
+                            if (queue.IniciarFila())
+                            {
+                                this._filas.Add(queue);
+                                return queue.ObtenhaPortaUtilizada();
+                            }
+                            else
+                            {
+                                throw new IlegalSubscribeException();
+                            }
                         }
                         catch
                         {

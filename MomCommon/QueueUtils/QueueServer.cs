@@ -7,7 +7,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
+using MomCommon.Utils;
 
 namespace MomCommon.QueueUtils
 {
@@ -58,42 +58,30 @@ namespace MomCommon.QueueUtils
                 IPAddress ip = IPAddress.Parse("127.0.0.1");
                 servidor = new TcpListener(ip, this._portaDeInicio);
                 servidor.Start();
-                byte[] buffer = new byte[1024];
                 while (true)
                 {
                     cliente = servidor.AcceptTcpClient();
                     NetworkStream networkStream = cliente.GetStream();
-
-                    int ultimoByteLido;
-                    var stringBuffer = new StringBuilder();
-                    while ((ultimoByteLido = networkStream.Read(buffer, 0, buffer.Length)) > -1)
-                    {
-                        stringBuffer.Append(buffer);
-                    }
                     try
                     {
-                        var subscribe = InterpretarMensagemRecebida(stringBuffer.ToString());
+                        var subscribe = InterpretarMensagemRecebida(networkStream.ObtenhaRespostaPorString());
                         int porta = 0;
                         lock (this._gerenciadorDefilas)
                         {
                             porta = this._gerenciadorDefilas.InicieNovaFila(subscribe);
                         }
-                        var mensagemDeRetorno = JsonConvert.SerializeObject(new RespostaSubscribe() { sucesso = true, porta = porta, mensagem = "Fila criada com sucesso!" });
-                        byte[] bytesDeEnvio = Encoding.UTF8.GetBytes(mensagemDeRetorno);
-                        networkStream.Write(bytesDeEnvio, 0, bytesDeEnvio.Length);
+                        networkStream.EnviarMensagemViaJson(new RespostaSubscribe() { sucesso = true, porta = porta, mensagem = "Fila criada com sucesso!" });
                     }
                     catch (ModeloDeIntegracaoIlegalException)
                     {
-                        var mensagemDeRetorno = JsonConvert.SerializeObject(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Não foi possível iniciar uma nova fila, verifique se os dados envidos estão dentro padrão." });
-                        byte[] bytesDeEnvio = Encoding.UTF8.GetBytes(mensagemDeRetorno);
-                        networkStream.Write(bytesDeEnvio, 0, bytesDeEnvio.Length);
-                        throw new QueueException("Erro ao inciar fila, subscribe informado é inválido");
+                        networkStream.EnviarMensagemViaJson(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Não foi possível iniciar uma nova fila, verifique se os dados envidos estão dentro padrão." });
+                    }catch(IlegalSubscribeException e)
+                    {
+                        networkStream.EnviarMensagemViaJson(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Não foi possível iniciar uma nova fila, verifique se os dados envidos estão dentro padrão. Dados inválidos ou fila já existe." });
                     }
                     catch (Exception e)
                     {
-                        var mensagemDeRetorno = JsonConvert.SerializeObject(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Ocorreu um erro inesperado ao inicar fila. " + e.Message });
-                        byte[] bytesDeEnvio = Encoding.UTF8.GetBytes(mensagemDeRetorno);
-                        networkStream.Write(bytesDeEnvio, 0, bytesDeEnvio.Length);
+                        networkStream.EnviarMensagemViaJson(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Ocorreu um erro inesperado ao inicar fila. " + e.Message });
                         throw new QueueException(string.Format("Erro desconhecido ao inciar fila. {0} {1} {2}", e, e.Message, e.StackTrace));
                     }
                     cliente.Close();
@@ -120,8 +108,6 @@ namespace MomCommon.QueueUtils
                 {
                     servidor.Stop();
                 }
-                Console.WriteLine("Iniciando novamente em 10 segundo.");
-                Thread.Sleep(10000);
                 RunThread();
             }
         }

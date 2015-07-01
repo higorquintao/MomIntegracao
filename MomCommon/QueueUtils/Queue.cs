@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using MomCommon.Utils;
 
 namespace MomCommon.QueueUtils
 {
@@ -44,35 +45,38 @@ namespace MomCommon.QueueUtils
                 _servidor = new TcpListener(ip, this._porta);
                 _servidor.Start();
 
-                byte[] buffer = new byte[1024]; ;
+                byte[] buffer = new byte[1024];
+                _cliente = _servidor.AcceptTcpClient();
+                _estadoDaConexao = true;
                 while (true)
                 {
-                    _estadoDaConexao = true;
-
-                    _cliente = _servidor.AcceptTcpClient();
-                    while (!_existeNovaMensagem)
-                    {
-                        Thread.Sleep(5000);
-                    }
-
                     var networkStream = _cliente.GetStream();
+                    var solicitacaoDeMensagem = networkStream.ObtenhaRespostaPorObjeto<SolicitacaoDeMensagem>();
 
-                    byte[] mensagem = Encoding.UTF8.GetBytes(this.ObtenhaProximaMensagem());
-
-                    networkStream.Write(mensagem, 0, mensagem.Length);
-
-                    _cliente.Close();
+                    if (solicitacaoDeMensagem.obterNovaMensagem)
+                    {
+                        networkStream.EnviarMensagemViaJson(this.ObtenhaProximaMensagem());
+                    }
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine(string.Format("Ocorreu um erro ao tentar iniciar a fila do subscriber {0} na porta {1}.", _subscribe.nome, _porta));
+                if (_cliente == null)
+                {
+                    Console.WriteLine(string.Format("Ocorreu um erro ao tentar iniciar a fila do subscriber {0} na porta {1}.", _subscribe.nome, _porta));
+                }else
+                {
+                    Console.WriteLine(string.Format("Subscriber {0} na porta {1} se desconectou.", _subscribe.nome, _porta));
+                }
                 Console.WriteLine(e.Message);
                 Console.WriteLine(e.StackTrace);
-                throw;
             }
             finally
             {
+                if (_cliente != null)
+                {
+                    _cliente.Close();
+                }
                 if (_servidor != null)
                 {
                     _servidor.Stop();
@@ -103,21 +107,28 @@ namespace MomCommon.QueueUtils
             return this._porta;
         }
 
-        private string ObtenhaProximaMensagem()
+        private MensagemParaEnvio ObtenhaProximaMensagem()
         {
-            var mensagem = this._listaDeMensagens.First(x => !x.jaConsumida);
-            mensagem.jaConsumida = true;
-            return mensagem.mensagem;
+            var mensagem = this._listaDeMensagens.Where(x => !x.jaConsumida).FirstOrDefault();
+            if (mensagem != null)
+            {
+                mensagem.jaConsumida = true;
+                return mensagem;
+            }
+            else
+            {
+                return new MensagemParaEnvio();
+            }
         }
 
         public bool ConexaoAtiva()
         {
-            return _servidor != null && _cliente != null && _cliente.Connected;
+            return _servidor != null;
         }
 
         public bool IniciarFila()
         {
-            if (this._threadPrincipal != null)
+            if (this._threadPrincipal == null)
             {
                 this._threadPrincipal = new Thread(new ThreadStart(Run));
                 this._threadPrincipal.Start();
@@ -128,21 +139,24 @@ namespace MomCommon.QueueUtils
 
         public void EncerrarFila()
         {
-            lock (this._cliente)
+            if (this._cliente != null)
             {
-                if (this._cliente != null)
+                lock (this._cliente)
                 {
                     this._cliente.Close();
                 }
             }
-            lock (this._servidor)
+            if (this._servidor != null)
             {
-                if (this._servidor != null)
+                lock (this._servidor)
                 {
                     this._servidor.Stop();
                 }
             }
-            this._threadPrincipal.Abort();
+            if (this._threadPrincipal != null)
+            {
+                this._threadPrincipal.Abort();
+            }
         }
     }
 }

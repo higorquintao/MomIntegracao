@@ -8,7 +8,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
+using MomCommon.Utils;
 
 namespace MomCommon.RoteadorDeMensagens
 {
@@ -64,43 +64,29 @@ namespace MomCommon.RoteadorDeMensagens
                     cliente = servidor.AcceptTcpClient();
                     NetworkStream networkStream = cliente.GetStream();
 
-                    int ultimoByteLido;
-                    var stringBuffer = new StringBuilder();
-                    while ((ultimoByteLido = networkStream.Read(buffer, 0, buffer.Length)) > -1)
-                    {
-                        stringBuffer.Append(buffer);
-                    }
                     try
                     {
-                        var mensagem = InterpretarMensagemRecebida(stringBuffer.ToString());
+                        var mensagem = InterpretarMensagemRecebida(networkStream.ObtenhaRespostaPorString());
                         lock (this._gerenciadorDefilas)
                         {
                             var queue = this._gerenciadorDefilas.ObtenhaFilaPeloNome(mensagem.nomeFila);
-                            if(queue != null)
+                            if (queue != null)
                             {
                                 queue.PublicarMensagem(mensagem.mensagem);
-
-                            }else
+                            }
+                            else
                             {
-                                var mensagemDeRetorno = JsonConvert.SerializeObject(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Não foi possível publicar sua mensagem, verifique se o nome da fila esta correto." });
-                                byte[] bytesDeEnvio = Encoding.UTF8.GetBytes(mensagemDeRetorno);
-                                networkStream.Write(bytesDeEnvio, 0, bytesDeEnvio.Length);
+                                networkStream.EnviarMensagemViaJson(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Não foi possível publicar sua mensagem, verifique se o nome da fila esta correto." });
                             }
                         }
                     }
                     catch (ModeloDeIntegracaoIlegalException)
                     {
-                        var mensagemDeRetorno = JsonConvert.SerializeObject(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Não foi possível iniciar uma nova fila, verifique se os dados envidos estão dentro padrão." });
-                        byte[] bytesDeEnvio = Encoding.UTF8.GetBytes(mensagemDeRetorno);
-                        networkStream.Write(bytesDeEnvio, 0, bytesDeEnvio.Length);
-                        throw new QueueException("Erro ao submeter mensagem, formato da mensagem inválido.");
+                        networkStream.EnviarMensagemViaJson(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Não foi possível iniciar uma nova fila, verifique se os dados envidos estão dentro padrão." });
                     }
                     catch (Exception e)
                     {
-                        var mensagemDeRetorno = JsonConvert.SerializeObject(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Ocorreu um erro inesperado ao obter fila. " + e.Message });
-                        byte[] bytesDeEnvio = Encoding.UTF8.GetBytes(mensagemDeRetorno);
-                        networkStream.Write(bytesDeEnvio, 0, bytesDeEnvio.Length);
-                        throw new QueueException(string.Format("Erro desconhecido ao obter mensagem. {0} {1} {2}", e, e.Message, e.StackTrace));
+                        networkStream.EnviarMensagemViaJson(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Ocorreu um erro inesperado ao obter fila. " + e.Message });
                     }
                     cliente.Close();
                 }
