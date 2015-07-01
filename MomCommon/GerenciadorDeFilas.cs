@@ -87,10 +87,17 @@ namespace MomCommon
                             }
                         }
                         tentativas++;
-                    };
+                    }
+                    return 0;
                 }
             }
-            throw new IlegalSubscribeException();
+            else
+            {
+                lock (this._filas)
+                {
+                    return this._filas.Where(x => x.ObtenhaSubscribe().nome == subscribe.nome).Select(x => x.ObtenhaPortaUtilizada()).FirstOrDefault();
+                }
+            }
         }
 
         public void EncerrarTodasAsFilas()

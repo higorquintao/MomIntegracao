@@ -41,15 +41,16 @@ namespace MomCommon.QueueUtils
         {
             try
             {
-                var ip = IPAddress.Parse("127.0.0.1");
+                var ip = IPAddress.Parse("0.0.0.0");
                 _servidor = new TcpListener(ip, this._porta);
                 _servidor.Start();
 
                 byte[] buffer = new byte[1024];
-                _cliente = _servidor.AcceptTcpClient();
-                _estadoDaConexao = true;
                 while (true)
                 {
+                    _cliente = _servidor.AcceptTcpClient();
+                    _estadoDaConexao = true;
+
                     var networkStream = _cliente.GetStream();
                     var solicitacaoDeMensagem = networkStream.ObtenhaRespostaPorObjeto<SolicitacaoDeMensagem>();
 
@@ -57,6 +58,7 @@ namespace MomCommon.QueueUtils
                     {
                         networkStream.EnviarMensagemViaJson(this.ObtenhaProximaMensagem());
                     }
+                    _cliente.Close();
                 }
             }
             catch (Exception e)
@@ -64,12 +66,11 @@ namespace MomCommon.QueueUtils
                 if (_cliente == null)
                 {
                     Console.WriteLine(string.Format("Ocorreu um erro ao tentar iniciar a fila do subscriber {0} na porta {1}.", _subscribe.nome, _porta));
-                }else
+                }
+                else
                 {
                     Console.WriteLine(string.Format("Subscriber {0} na porta {1} se desconectou.", _subscribe.nome, _porta));
                 }
-                Console.WriteLine(e.Message);
-                Console.WriteLine(e.StackTrace);
             }
             finally
             {

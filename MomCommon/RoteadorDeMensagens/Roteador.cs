@@ -55,7 +55,7 @@ namespace MomCommon.RoteadorDeMensagens
             TcpClient cliente = null;
             try
             {
-                IPAddress ip = IPAddress.Parse("127.0.0.1");
+                IPAddress ip = IPAddress.Parse("0.0.0.0");
                 servidor = new TcpListener(ip, this._portaDeInicio);
                 servidor.Start();
                 byte[] buffer = new byte[1024];

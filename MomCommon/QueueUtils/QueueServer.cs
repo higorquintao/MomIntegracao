@@ -55,7 +55,7 @@ namespace MomCommon.QueueUtils
             TcpClient cliente = null;
             try
             {
-                IPAddress ip = IPAddress.Parse("127.0.0.1");
+                IPAddress ip = IPAddress.Parse("0.0.0.0");
                 servidor = new TcpListener(ip, this._portaDeInicio);
                 servidor.Start();
                 while (true)
@@ -74,10 +74,10 @@ namespace MomCommon.QueueUtils
                     }
                     catch (ModeloDeIntegracaoIlegalException)
                     {
-                        networkStream.EnviarMensagemViaJson(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Não foi possível iniciar uma nova fila, verifique se os dados envidos estão dentro padrão." });
+                        networkStream.EnviarMensagemViaJson(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Não foi possível iniciar uma nova fila, dados informados são inválidos." });
                     }catch(IlegalSubscribeException e)
                     {
-                        networkStream.EnviarMensagemViaJson(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Não foi possível iniciar uma nova fila, verifique se os dados envidos estão dentro padrão. Dados inválidos ou fila já existe." });
+                        networkStream.EnviarMensagemViaJson(new RespostaSubscribe() { sucesso = false, porta = 0, mensagem = "Não foi possível iniciar uma nova fila, verifique se os dados envidos estão dentro padrão." });
                     }
                     catch (Exception e)
                     {
